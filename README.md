@@ -1,4 +1,4 @@
-# Netflix Clone - Full-Stack Starter Template
+# MovieRate - Netflix Clone
 
 A modern, production-ready Netflix clone built with Next.js, Supabase, and Python microservices. Features AI-powered recommendations, intelligent search, comprehensive analytics, and admin supervision tools.
 

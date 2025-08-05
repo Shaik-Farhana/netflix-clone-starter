@@ -1,32 +1,49 @@
 import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import "./globals.css"
-import { Providers } from "@/components/providers"
-import { Navbar } from "@/components/layout/navbar"
+import { Inter } from "next/font/google"
+import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
+import { getSupabaseServerClient } from "@/lib/supabase/server"
+import { cookies } from "next/headers" // Import cookies
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata: Metadata = {
-  title: "MovieRate - Rate Movies & Get Recommendations",
-  description: "Rate movies, get personalized recommendations, and find where to watch your favorite films.",
+export const metadata = {
+  title: "CineTrack",
+  description: "Your personalized movie and TV show tracker.",
     generator: 'v0.dev'
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await getSupabaseServerClient() // Await the Supabase client
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  // Get sidebar default open state from cookie [^4]
+  const cookieStore = await cookies() // Await the cookies() call
+  const defaultOpen = cookieStore.get("sidebar:state")?.value === "true"
+
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>
-          <Navbar />
-          <main>{children}</main>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+          <SidebarProvider defaultOpen={defaultOpen}>
+            {session && <AppSidebar />} {/* Only render sidebar if session exists */}
+            <SidebarInset className={session ? "" : "ml-0"}>
+              {session && (
+                <header className="flex h-16 shrink-0 items-center gap-2 border-b border-netflix-dark-light px-4">
+                  <SidebarTrigger className="-ml-1" />
+                  <span className="text-xl font-semibold text-primary">CineTrack</span>
+                </header>
+              )}
+              {children}
+            </SidebarInset>
+          </SidebarProvider>
           <Toaster />
-        </Providers>
+        </ThemeProvider>
       </body>
     </html>
   )

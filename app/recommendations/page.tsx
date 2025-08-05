@@ -1,85 +1,43 @@
-"use client"
+import { Suspense } from "react"
+import { redirect } from "next/navigation"
+import { getSupabaseServerClient } from "@/lib/supabase/server"
+import { Recommendations } from "@/components/recommendations"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-import { useEffect, useState } from "react"
-import { Navbar } from "@/components/layout/navbar"
-import { RecommendationGrid } from "@/components/recommendations/recommendation-grid"
-import { RecommendationFilters } from "@/components/recommendations/recommendation-filters"
-import { useRecommendations } from "@/hooks/use-recommendations"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+export default async function RecommendationsPage() {
+  const supabase = await getSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-export default function RecommendationsPage() {
-  const [activeTab, setActiveTab] = useState("for-you")
-  const [filters, setFilters] = useState({
-    genre: "",
-    mood: "",
-    duration: "",
-  })
+  if (!user) {
+    redirect("/") // Redirect to login if not authenticated
+  }
 
-  const { data: recommendations, isLoading, fetchRecommendations } = useRecommendations()
+  const { data: userProfile, error: profileError } = await supabase
+    .from("user_profiles")
+    .select("onboarding_complete")
+    .eq("user_id", user.id)
+    .single()
 
-  useEffect(() => {
-    fetchRecommendations(activeTab, filters)
-  }, [activeTab, filters, fetchRecommendations])
+  if (profileError || !userProfile?.onboarding_complete) {
+    redirect("/onboarding") // Redirect to onboarding if not complete
+  }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Recommendations</h1>
+    <div className="flex flex-1 flex-col p-4 md:p-8">
+      <h1 className="mb-6 text-3xl font-bold text-primary">Your Personalized Recommendations</h1>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-          <TabsList className="bg-gray-800 border-gray-700">
-            <TabsTrigger value="for-you" className="data-[state=active]:bg-red-600">
-              For You
-            </TabsTrigger>
-            <TabsTrigger value="trending" className="data-[state=active]:bg-red-600">
-              Trending
-            </TabsTrigger>
-            <TabsTrigger value="similar" className="data-[state=active]:bg-red-600">
-              Similar to Watched
-            </TabsTrigger>
-            <TabsTrigger value="new-releases" className="data-[state=active]:bg-red-600">
-              New Releases
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mt-8">
-            <div className="lg:col-span-1">
-              <RecommendationFilters filters={filters} onFiltersChange={setFilters} />
-            </div>
-            <div className="lg:col-span-3">
-              <TabsContent value="for-you">
-                <RecommendationGrid
-                  recommendations={recommendations?.forYou || []}
-                  isLoading={isLoading}
-                  title="Personalized for You"
-                />
-              </TabsContent>
-              <TabsContent value="trending">
-                <RecommendationGrid
-                  recommendations={recommendations?.trending || []}
-                  isLoading={isLoading}
-                  title="Trending Now"
-                />
-              </TabsContent>
-              <TabsContent value="similar">
-                <RecommendationGrid
-                  recommendations={recommendations?.similar || []}
-                  isLoading={isLoading}
-                  title="Because You Watched"
-                />
-              </TabsContent>
-              <TabsContent value="new-releases">
-                <RecommendationGrid
-                  recommendations={recommendations?.newReleases || []}
-                  isLoading={isLoading}
-                  title="New Releases"
-                />
-              </TabsContent>
-            </div>
-          </div>
-        </Tabs>
-      </div>
+      <Card className="bg-card text-card-foreground border-netflix-dark-light">
+        <CardHeader>
+          <CardTitle className="text-xl text-primary">Recommendations for You</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<div>Generating recommendations...</div>}>
+            <Recommendations userId={user.id} />
+          </Suspense>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { MovieCard } from "@/components/movie-card"
 
+// genre_ids: number[] (int4[] in PG); language_ids: string[] (uuid[] in PG)
 interface Movie {
   id: string
   title: string
@@ -16,16 +17,18 @@ interface Movie {
   release_year: number | null
   poster_url: string | null
   type: string
-  genre_ids: number[]
-  language_ids: number[]
+  genre_ids: number[]         // int4[]
+  language_ids: string[]      // uuid[]
   avg_rating?: number | null
 }
 
+// genres.id: number (int4 in PG)
 interface Genre {
-  id: string
+  id: number
   name: string
 }
 
+// languages.id: string (uuid in PG)
 interface Language {
   id: string
   name: string
@@ -48,9 +51,10 @@ export function DiscoverContent({
   useEffect(() => {
     let active = true
     setLoading(true)
+    // genre: int | null, language: uuid | null
     supabase.rpc("get_movies_with_avg_ratings", {
       q: searchQuery || null,
-      genre: genreFilter !== "all" ? genreFilter : null,
+      genre: genreFilter !== "all" ? Number(genreFilter) : null,
       language: languageFilter !== "all" ? languageFilter : null,
     }).then(({ data, error }) => {
       if (!active) return
@@ -66,11 +70,14 @@ export function DiscoverContent({
     return () => { active = false }
   }, [searchQuery, genreFilter, languageFilter, typeFilter])
 
+  // -- genre_ids (number[]), genres (id: number)
   function getGenreObjects(ids: number[]) {
-    return Array.isArray(ids) ? genres.filter((g) => ids.includes(Number(g.id))) : []
+    return Array.isArray(ids) ? genres.filter((g) => ids.includes(g.id)) : []
   }
-  function getLanguageObjects(ids: number[]) {
-    return Array.isArray(ids) ? languages.filter((l) => ids.includes(Number(l.id))) : []
+
+  // -- language_ids (string[]), languages (id: string)
+  function getLanguageObjects(ids: string[]) {
+    return Array.isArray(ids) ? languages.filter((l) => ids.includes(l.id)) : []
   }
 
   const handleClearFilters = () => {
@@ -82,7 +89,7 @@ export function DiscoverContent({
 
   return (
     <div className="container mx-auto p-4">
-      {/* FILTER FORM: only here, just one! */}
+      {/* FILTER FORM */}
       <form
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8"
         onSubmit={e => e.preventDefault()}
@@ -117,7 +124,7 @@ export function DiscoverContent({
             <SelectContent>
               <SelectItem value="all">All Languages</SelectItem>
               {languages.map((lang) => (
-                <SelectItem key={lang.id} value={lang.id.toString()}>{lang.name}</SelectItem>
+                <SelectItem key={lang.id} value={lang.id}>{lang.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

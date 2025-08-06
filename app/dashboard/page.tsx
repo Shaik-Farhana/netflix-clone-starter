@@ -8,14 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default async function DashboardPage() {
   const supabase = await getSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
+  // Get user authentication state
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     redirect("/") // Redirect to login if not authenticated
   }
 
+  // Check onboarding completion
   const { data: userProfile, error: profileError } = await supabase
     .from("user_profiles")
     .select("onboarding_complete")
@@ -26,15 +26,20 @@ export default async function DashboardPage() {
     redirect("/onboarding") // Redirect to onboarding if not complete
   }
 
+  // Main dashboard layout
   return (
     <div className="flex flex-1 flex-col p-4 md:p-8">
-      <h1 className="mb-6 text-3xl font-bold text-primary">Your Dashboard</h1>
+      <h1 className="mb-6 text-3xl font-bold text-primary">
+        Your Dashboard
+      </h1>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Watched Movies Section */}
+        {/* Watched Movies */}
         <Card className="md:col-span-2 lg:col-span-2 bg-card text-card-foreground border-netflix-dark-light">
           <CardHeader>
-            <CardTitle className="text-xl text-primary">Recently Watched & Rated</CardTitle>
+            <CardTitle className="text-xl text-primary">
+              Recently Watched & Rated
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Suspense fallback={<div>Loading watched movies...</div>}>
@@ -43,10 +48,12 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* User Analytics Section */}
+        {/* Analytics */}
         <Card className="bg-card text-card-foreground border-netflix-dark-light">
           <CardHeader>
-            <CardTitle className="text-xl text-primary">Your Viewing Habits</CardTitle>
+            <CardTitle className="text-xl text-primary">
+              Your Viewing Habits
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Suspense fallback={<div>Loading analytics...</div>}>
@@ -55,10 +62,12 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recommendations Section */}
+        {/* Recommendations */}
         <Card className="md:col-span-3 bg-card text-card-foreground border-netflix-dark-light">
           <CardHeader>
-            <CardTitle className="text-xl text-primary">Personalized Recommendations</CardTitle>
+            <CardTitle className="text-xl text-primary">
+              Personalized Recommendations
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Suspense fallback={<div>Loading recommendations...</div>}>

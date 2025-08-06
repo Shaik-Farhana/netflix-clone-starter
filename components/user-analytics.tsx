@@ -16,6 +16,7 @@ import {
   Legend,
 } from "recharts"
 import { Badge } from "@/components/ui/badge"
+import * as React from "react"
 
 interface GenreData {
   name: string
@@ -36,12 +37,19 @@ interface UserAnalyticsProps {
   genreLookup?: Record<string, string>
 }
 
+// Palette for chart slices (safe colorblind-friendly)
 const COLORS = [
-  "#0088FE", "#00C49F", "#FFBB28", "#FF8042",
-  "#AF19FF", "#FF1919", "#19FFD1", "#FFD119"
+  "#0088FE",
+  "#00C49F",
+  "#FFBB28",
+  "#FF8042",
+  "#AF19FF",
+  "#FF1919",
+  "#19FFD1",
+  "#FFD119"
 ]
 
-// Utility to safely format numbers, with fallback for undefined/null/NaN
+// Utility: Format number (with fallback for null/NaN)
 function safeNum(val: unknown, digits = 2, fallback: string | number = "N/A") {
   return typeof val === "number" && isFinite(val)
     ? val.toFixed(digits)
@@ -56,7 +64,7 @@ export function UserAnalytics({
   preferredGenreIds = [],
   genreLookup = {},
 }: UserAnalyticsProps) {
-  // Defensive: always work with array
+  // Defensive: always arrays
   const genreList = Array.isArray(genreData) ? genreData : []
   const ratingList = Array.isArray(ratingData) ? ratingData : []
   const prefGenres = Array.isArray(preferredGenreIds) ? preferredGenreIds : []
@@ -126,7 +134,7 @@ export function UserAnalytics({
           <CardContent>
             {genreList.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={genreList} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <BarChart data={genreList}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
                   <XAxis dataKey="name" stroke="hsl(var(--foreground))" />
                   <YAxis stroke="hsl(var(--foreground))" />
@@ -184,7 +192,7 @@ export function UserAnalytics({
               </ResponsiveContainer>
             ) : (
               <p className="text-center text-muted-foreground">
-                No rating data available from watched content.
+                No rating data available.
               </p>
             )}
           </CardContent>
@@ -198,7 +206,7 @@ export function UserAnalytics({
         {prefGenres.length > 0 ? (
           prefGenres.map((genreId) => (
             <Badge key={genreId}>
-              {genreLookup[genreId] ?? `${genreId.substring(0, 8)}...`}
+              {genreLookup?.[genreId] ?? `${genreId.substring(0, 8)}...`}
             </Badge>
           ))
         ) : (

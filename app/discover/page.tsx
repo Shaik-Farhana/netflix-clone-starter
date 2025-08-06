@@ -5,6 +5,12 @@ import { DiscoverContent } from "@/components/discover-content"
 export default async function DiscoverPage() {
   const supabase = await getSupabaseServerClient()
 
+  // User fetch
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Genre/lang fetch
   const { data: genres, error: genresError } = await supabase
     .from("genres")
     .select("id, name")
@@ -24,6 +30,7 @@ export default async function DiscoverPage() {
         <DiscoverContent
           genres={Array.isArray(genres) ? genres : []}
           languages={Array.isArray(languages) ? languages : []}
+          userId={user?.id || ""}
         />
       </Suspense>
     </div>

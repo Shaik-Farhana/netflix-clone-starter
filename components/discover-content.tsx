@@ -9,7 +9,6 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { MovieCard } from "@/components/movie-card"
 
-// genre_ids: number[] (int4[] in PG); language_ids: string[] (uuid[] in PG)
 interface Movie {
   id: string
   title: string
@@ -17,27 +16,21 @@ interface Movie {
   release_year: number | null
   poster_url: string | null
   type: string
-  genre_ids: number[]         // int4[]
-  language_ids: string[]      // uuid[]
+  genre_ids: number[]
+  language_ids: string[]
   avg_rating?: number | null
+  is_watched?: boolean
+  user_rating?: number | null
+  user_review?: string | null
 }
-
-// genres.id: number (int4 in PG)
-interface Genre {
-  id: number
-  name: string
-}
-
-// languages.id: string (uuid in PG)
-interface Language {
-  id: string
-  name: string
-}
+interface Genre { id: number; name: string }
+interface Language { id: string; name: string }
 
 export function DiscoverContent({
   genres,
   languages,
-}: { genres: Genre[]; languages: Language[] }) {
+  userId,
+}: { genres: Genre[]; languages: Language[]; userId: string }) {
   const supabase = getSupabaseBrowserClient()
   const { toast } = useToast()
 
@@ -47,38 +40,49 @@ export function DiscoverContent({
   const [typeFilter, setTypeFilter] = useState("all")
   const [movies, setMovies] = useState<Movie[]>([])
   const [loading, setLoading] = useState(false)
+  const [refresh, setRefresh] = useState(0)
 
   useEffect(() => {
     let active = true
     setLoading(true)
-    // genre: int | null, language: uuid | null
     supabase.rpc("get_movies_with_avg_ratings", {
       q: searchQuery || null,
       genre: genreFilter !== "all" ? Number(genreFilter) : null,
       language: languageFilter !== "all" ? languageFilter : null,
-    }).then(({ data, error }) => {
+    }).then(async ({ data, error }) => {
       if (!active) return
-      let filtered = Array.isArray(data) ? data : []
-      if (typeFilter !== "all")
-        filtered = filtered.filter(m => m.type === typeFilter)
-      setMovies(filtered)
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" })
+      let filtered: Movie[] = Array.isArray(data) ? data : []
+      if (typeFilter !== "all") filtered = filtered.filter(m => m.type === typeFilter)
+
+      // --- USER-STATE FETCH (watched/rated/reviewed) ---
+      let watchedSet = new Set<string>()
+      let ratingsMap: Record<string, number> = {}
+      let reviewsMap: Record<string, string> = {}
+      const movieIds = filtered.map(m => m.id)
+      if (userId && movieIds.length) {
+        const [{ data: watchedRows }, { data: ratingsRows }, { data: reviewsRows }] = await Promise.all([
+          supabase.from("user_watched_content").select("movie_id").eq("user_id", userId).in("movie_id", movieIds),
+          supabase.from("ratings").select("movie_id, rating_value").eq("user_id", userId).in("movie_id", movieIds),
+          supabase.from("reviews").select("movie_id, review_text").eq("user_id", userId).in("movie_id", movieIds),
+        ])
+        watchedSet = new Set((watchedRows ?? []).map((x: any) => x.movie_id))
+        ;(ratingsRows ?? []).forEach((r: any) => { ratingsMap[r.movie_id] = r.rating_value })
+        ;(reviewsRows ?? []).forEach((r: any) => { reviewsMap[r.movie_id] = r.review_text })
       }
+
+      filtered = filtered.map((m: Movie) => ({
+        ...m,
+        is_watched: watchedSet.has(m.id),
+        user_rating: ratingsMap[m.id] ?? null,
+        user_review: reviewsMap[m.id] ?? null,
+      }))
+
+      setMovies(filtered)
+      if (error) toast({ title: "Error", description: error.message, variant: "destructive" })
       setLoading(false)
     })
     return () => { active = false }
-  }, [searchQuery, genreFilter, languageFilter, typeFilter])
-
-  // -- genre_ids (number[]), genres (id: number)
-  function getGenreObjects(ids: number[]) {
-    return Array.isArray(ids) ? genres.filter((g) => ids.includes(g.id)) : []
-  }
-
-  // -- language_ids (string[]), languages (id: string)
-  function getLanguageObjects(ids: string[]) {
-    return Array.isArray(ids) ? languages.filter((l) => ids.includes(l.id)) : []
-  }
+  }, [searchQuery, genreFilter, languageFilter, typeFilter, userId, refresh])
 
   const handleClearFilters = () => {
     setSearchQuery("")
@@ -86,10 +90,17 @@ export function DiscoverContent({
     setLanguageFilter("all")
     setTypeFilter("all")
   }
+  const refetchAll = () => setRefresh(r => r + 1)
+
+  function getGenreObjects(ids: number[]) {
+    return Array.isArray(ids) ? genres.filter((g) => ids.includes(g.id)) : []
+  }
+  function getLanguageObjects(ids: string[]) {
+    return Array.isArray(ids) ? languages.filter((l) => ids.includes(l.id)) : []
+  }
 
   return (
     <div className="container mx-auto p-4">
-      {/* FILTER FORM */}
       <form
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8"
         onSubmit={e => e.preventDefault()}
@@ -147,10 +158,11 @@ export function DiscoverContent({
           </Button>
         )}
       </form>
-      {/* MOVIES */}
+
+      {/* Movies Listing */}
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {Array.from({ length: 10 }).map((_, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="aspect-[2/3] w-full rounded-md bg-muted animate-pulse" />
           ))}
         </div>
@@ -159,7 +171,7 @@ export function DiscoverContent({
           <p>No content found matching your criteria.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {movies.map((movie) => (
             <MovieCard
               key={movie.id}
@@ -168,6 +180,8 @@ export function DiscoverContent({
                 genres: getGenreObjects(movie.genre_ids ?? []),
                 languages: getLanguageObjects(movie.language_ids ?? []),
               }}
+              onWatchedStatusChange={refetchAll}
+              onReviewSubmitted={refetchAll}
             />
           ))}
         </div>

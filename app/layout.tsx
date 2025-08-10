@@ -11,9 +11,8 @@ import { cookies } from "next/headers" // Import cookies
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "CineTrack",
+  title: "MovieRate",
   description: "Your personalized movie and TV show tracker.",
-    generator: 'v0.dev'
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -36,7 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {session && (
                 <header className="flex h-16 shrink-0 items-center gap-2 border-b border-netflix-dark-light px-4">
                   <SidebarTrigger className="-ml-1" />
-                  <span className="text-xl font-semibold text-primary">CineTrack</span>
+                  <span className="text-xl font-semibold text-primary">MovieRate</span>
                 </header>
               )}
               {children}

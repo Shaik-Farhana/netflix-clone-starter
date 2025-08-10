@@ -98,6 +98,28 @@ export function Recommendations({ content }: RecommendationsProps) {
         return;
       }
 
+      const currentWatchedCount = (watchedContent ?? []).length;
+
+      // Fetch stored recommendations
+      const { data: storedRecs, error: storedError } = await supabase
+        .from("user_recommendations")
+        .select("recommendations, watched_count")
+        .eq("user_id", userId)
+        .single();
+
+      if (storedError && storedError.code !== "PGRST116") { // Ignore if no row found
+        toast({ title: "Error fetching stored recommendations", description: storedError.message, variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if we can use stored recommendations
+      if (storedRecs && storedRecs.watched_count === currentWatchedCount) {
+        setRecommendations(storedRecs.recommendations ?? []);
+        setIsLoading(false);
+        return;
+      }
+
       // Prepare watched IDs
       const watchedIds = (watchedContent ?? [])
         .map((item) => item.movies_tv_shows?.id)
@@ -110,7 +132,7 @@ export function Recommendations({ content }: RecommendationsProps) {
         .eq("user_id", userId)
         .single();
 
-      // Use lookups for watched summary if wanted:
+      // Use lookups for watched summary
       const watchedMoviesSummary = (watchedContent ?? [])
         .filter((item) => item.movies_tv_shows)
         .map((item) => {
@@ -144,7 +166,7 @@ export function Recommendations({ content }: RecommendationsProps) {
         }
       }
 
-      // Construct AI prompt (you may update this for only recommending available titles if needed)
+      // Construct AI prompt
       const prompt = `
         The user has watched the following content:
         ${watchedMoviesSummary || "No content watched yet."}
@@ -218,26 +240,22 @@ export function Recommendations({ content }: RecommendationsProps) {
         const finalRecommendations: RecommendedContent[] = [];
         const seen = new Set<string>();
 
-        // Use DB records when found; fallback generates unique string ID per title+type
         for (const aiRec of aiRecommendations || []) {
           const foundInDb = dbContent?.find((dbItem) => dbItem.title === aiRec.title);
 
-          // Use DB entry if exists, else fallback
           let rec: RecommendedContent;
           if (foundInDb) {
             rec = {
               ...foundInDb,
               description: foundInDb.overview ?? aiRec.overview ?? null,
-              // If DB doesn't have overview, use AI's brief overview as description!
               ott_platforms: Array.isArray(foundInDb.movie_ott_platforms)
                 ? foundInDb.movie_ott_platforms.map((p: any) => ({
-                  name: p.ott_platforms?.name || "",
-                  icon_url: p.ott_platforms?.icon_url || null,
-                }))
+                    name: p.ott_platforms?.name || "",
+                    icon_url: p.ott_platforms?.icon_url || null,
+                  }))
                 : [],
             };
           } else {
-            // Fallback: use AI data, but synthesize a unique id for react keys
             rec = {
               id: `ai-rec-${aiRec.title.replace(/\s/g, "-").toLowerCase()}-${aiRec.type}`,
               title: aiRec.title,
@@ -251,11 +269,24 @@ export function Recommendations({ content }: RecommendationsProps) {
               ott_platforms: [],
             };
           }
-          // Add only if not already in "seen" by unique id (fixes duplicate keys)
           if (!seen.has(rec.id)) {
             finalRecommendations.push(rec);
             seen.add(rec.id);
           }
+        }
+
+        // Store the new recommendations
+        const { error: storeError } = await supabase
+          .from("user_recommendations")
+          .upsert({
+            user_id: userId,
+            recommendations: finalRecommendations,
+            watched_count: currentWatchedCount,
+            generated_at: new Date().toISOString(),
+          }, { onConflict: "user_id" });
+
+        if (storeError) {
+          toast({ title: "Error storing recommendations", description: storeError.message, variant: "destructive" });
         }
 
         setRecommendations(finalRecommendations);
@@ -309,16 +340,24 @@ export function Recommendations({ content }: RecommendationsProps) {
             No recommendations available yet. Watch and rate more movies to get better suggestions!
           </p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 md:gap-8">
             {recommendations.map((movie) => (
-              <MovieCard
+              <div
                 key={movie.id}
-                movie={movie}
-                readOnlyRating
-                allGenres={allGenres}
-                allOttPlatforms={allOttPlatforms}
-                allLanguages={allLanguages}
-              />
+                className="rounded-2xl shadow-lg overflow-hidden border border-border bg-card"
+              >
+                <MovieCard
+                  movie={{
+                    ...movie,
+                    genres: allGenres.filter(g => movie.genre_ids.includes(g.id)).map(g => ({ name: g.name })),
+                    languages: allLanguages.filter(l => movie.language_ids.includes(l.id)).map(l => ({ name: l.name })),
+                    ott_platforms: movie.ott_platforms?.map(p => ({ name: p.name })),
+                    overview: movie.description || movie.overview,
+                  }}
+                  readOnlyRating
+                  variant="full" // or "compact" if preferred
+                />
+              </div>
             ))}
           </div>
         )}

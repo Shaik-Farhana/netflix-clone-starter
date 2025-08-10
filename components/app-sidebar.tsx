@@ -128,7 +128,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <Link href="/dashboard" className="flex items-center gap-2 px-2 py-4 text-2xl font-bold text-primary">
           <Film className="h-8 w-8" />
-          <span>CineTrack</span>
+          <span>MovieRate</span>
         </Link>
       </SidebarHeader>
 

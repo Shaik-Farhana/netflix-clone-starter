@@ -35,7 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {session && (
                 <header className="flex h-16 shrink-0 items-center gap-2 border-b border-netflix-dark-light px-4">
                   <SidebarTrigger className="-ml-1" />
-                  <span className="text-xl font-semibold text-primary">MovieRate</span>
+                  <span className="text-xl font-semibold text-primary">CineTrack</span>
                 </header>
               )}
               {children}

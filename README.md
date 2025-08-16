@@ -120,32 +120,6 @@ netflix-clone-starter/
 
 ---
 
-## 📊 Roadmap
-
-* [ ] Add user watch history tracking
-* [ ] Enhance recommendation system (deep learning)
-* [ ] Add genre-trend visualizations
-* [ ] Implement subscription/payment system
-* [ ] Deploy all services with Docker
-
----
-
-## 📸 Screenshots (Optional)
-
-*Add screenshots or a GIF demo of your Netflix clone here.*
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome!
-
-1. Fork the repo
-2. Create a new branch (`feature/xyz`)
-3. Commit changes & open a PR
-
----
-
 ## 📜 License
 
 MIT License © 2025 [Shaik Farhana](https://github.com/Shaik-Farhana)

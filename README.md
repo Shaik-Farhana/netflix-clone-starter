@@ -41,7 +41,7 @@ AI IMDb Platform is a full-stack Next.js application that combines movie discove
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/ai-imdb-platform.git
+git clone https://github.com/Shaik-Farhana/netflix-clone-starter.git
 cd ai-imdb-platform
 ```
 

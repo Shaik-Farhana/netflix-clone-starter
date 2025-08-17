@@ -1,6 +1,4 @@
-<img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
-
-# 🎬 AI IMDb Platform
+# 🎬 MovieRate: AI IMDb Platform
 
 > An intelligent movie and TV show discovery platform powered by AI recommendations
 

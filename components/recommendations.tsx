@@ -107,7 +107,7 @@ export function Recommendations({ content }: RecommendationsProps) {
         .eq("user_id", userId)
         .single();
 
-      if (storedError && storedError.code !== "PGRST116") { // Ignore if no row found
+      if (storedError && storedError.code !== "PGRST116") {
         toast({ title: "Error fetching stored recommendations", description: storedError.message, variant: "destructive" });
         setIsLoading(false);
         return;
@@ -115,6 +115,7 @@ export function Recommendations({ content }: RecommendationsProps) {
 
       // Check if we can use stored recommendations
       if (storedRecs && storedRecs.watched_count === currentWatchedCount) {
+        console.log("Using stored recommendations:", storedRecs.recommendations);
         setRecommendations(storedRecs.recommendations ?? []);
         setIsLoading(false);
         return;
@@ -197,7 +198,6 @@ export function Recommendations({ content }: RecommendationsProps) {
           throw new Error(errorData.error || "Failed to fetch recommendations from AI.");
         }
 
-        // Always expect recommendations: any[]
         const { recommendations: aiRecommendations } = await response.json();
 
         // Pull recommended titles
@@ -205,7 +205,9 @@ export function Recommendations({ content }: RecommendationsProps) {
           ? aiRecommendations.map((rec: any) => rec.title)
           : [];
 
-        // Fetch real content for recommendations (only those that exist in DB)
+        console.log("AI recommended titles:", recommendedTitles);
+
+        // Fetch real content for recommendations - MAKE SURE poster_url is selected
         let dbContent: any[] = [];
         if (recommendedTitles.length > 0) {
           const { data, error: dbError } = await supabase
@@ -233,7 +235,12 @@ export function Recommendations({ content }: RecommendationsProps) {
               variant: "destructive",
             });
           }
+          
           dbContent = data ?? [];
+          console.log("DB content with poster URLs:", dbContent.map(item => ({ 
+            title: item.title, 
+            poster_url: item.poster_url 
+          })));
         }
 
         // Merge/Annotate: prefers DB content; fallbacks for non-existent
@@ -241,13 +248,25 @@ export function Recommendations({ content }: RecommendationsProps) {
         const seen = new Set<string>();
 
         for (const aiRec of aiRecommendations || []) {
-          const foundInDb = dbContent?.find((dbItem) => dbItem.title === aiRec.title);
+          const foundInDb = dbContent?.find((dbItem) => 
+            dbItem.title.toLowerCase().trim() === aiRec.title.toLowerCase().trim()
+          );
 
           let rec: RecommendedContent;
           if (foundInDb) {
+            console.log(`Found in DB: ${foundInDb.title}, poster_url: ${foundInDb.poster_url}`);
             rec = {
-              ...foundInDb,
+              id: foundInDb.id,
+              title: foundInDb.title,
               description: foundInDb.overview ?? aiRec.overview ?? null,
+              overview: foundInDb.overview ?? aiRec.overview ?? null,
+              release_year: foundInDb.release_year,
+              type: foundInDb.type,
+              // IMPORTANT: Make sure poster_url is properly assigned
+              poster_url: foundInDb.poster_url,
+              language_ids: foundInDb.language_ids || [],
+              genre_ids: foundInDb.genre_ids || [],
+              languages: foundInDb.languages,
               ott_platforms: Array.isArray(foundInDb.movie_ott_platforms)
                 ? foundInDb.movie_ott_platforms.map((p: any) => ({
                     name: p.ott_platforms?.name || "",
@@ -256,12 +275,14 @@ export function Recommendations({ content }: RecommendationsProps) {
                 : [],
             };
           } else {
+            console.log(`NOT found in DB: ${aiRec.title}`);
             rec = {
               id: `ai-rec-${aiRec.title.replace(/\s/g, "-").toLowerCase()}-${aiRec.type}`,
               title: aiRec.title,
               description: aiRec.overview ?? null,
+              overview: aiRec.overview ?? null,
               type: aiRec.type || "movie",
-              poster_url: `/placeholder.svg?height=300&width=200&query=${encodeURIComponent(aiRec.title + " poster")}`,
+              poster_url: null,
               release_year: null,
               genre_ids: [],
               language_ids: [],
@@ -269,11 +290,16 @@ export function Recommendations({ content }: RecommendationsProps) {
               ott_platforms: [],
             };
           }
+          
           if (!seen.has(rec.id)) {
             finalRecommendations.push(rec);
             seen.add(rec.id);
           }
         }
+
+        console.log("Final recommendations with poster URLs:", 
+          finalRecommendations.map(r => ({ title: r.title, poster_url: r.poster_url }))
+        );
 
         // Store the new recommendations
         const { error: storeError } = await supabase
@@ -303,8 +329,7 @@ export function Recommendations({ content }: RecommendationsProps) {
     };
 
     fetchRecommendations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, supabase, toast]);
 
   // UI: show loader while fetching
   if (isLoading) {
@@ -340,30 +365,41 @@ export function Recommendations({ content }: RecommendationsProps) {
             No recommendations available yet. Watch and rate more movies to get better suggestions!
           </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 md:gap-8">
-            {recommendations.map((movie) => (
-              <div
-                key={movie.id}
-                className="rounded-2xl shadow-lg overflow-hidden border border-border bg-card"
-              >
-                <MovieCard
-                  movie={{
-                    ...movie,
-                    genres: allGenres.filter(g => movie.genre_ids.includes(g.id)).map(g => ({ name: g.name })),
-                    languages: allLanguages.filter(l => movie.language_ids.includes(l.id)).map(l => ({ name: l.name })),
-                    ott_platforms: movie.ott_platforms?.map(p => ({ name: p.name })),
-                    overview: movie.description || movie.overview,
-                  }}
-                  readOnlyRating
-                  variant="full" // or "compact" if preferred
-                />
-              </div>
-            ))}
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 md:gap-8">
+              {recommendations.map((movie) => {
+                console.log(`Rendering MovieCard for ${movie.title} with poster_url: ${movie.poster_url}`);
+                
+                return (
+                  <div
+                    key={movie.id}
+                    className="rounded-2xl shadow-lg overflow-hidden border border-border bg-card"
+                  >
+                    <MovieCard
+                      movie={{
+                        id: movie.id,
+                        title: movie.title,
+                        release_year: movie.release_year || 0,
+                        poster_url: movie.poster_url, // This should now work
+                        overview: movie.description || movie.overview || null,
+                        genres: allGenres.filter(g => movie.genre_ids.includes(g.id)).map(g => ({ name: g.name })),
+                        languages: allLanguages.filter(l => movie.language_ids.includes(l.id)).map(l => ({ name: l.name })),
+                        ott_platforms: movie.ott_platforms?.map(p => ({ name: p.name })) || [],
+                      }}
+                      readOnlyRating
+                      variant="full"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+        {content && (
+          <div className="prose prose-invert max-w-none mt-6">
+            <div dangerouslySetInnerHTML={{ __html: marked(content ?? "") }} />
           </div>
         )}
-        <div className="prose prose-invert max-w-none mt-6">
-          <div dangerouslySetInnerHTML={{ __html: marked(content ?? "") }} />
-        </div>
       </CardContent>
     </Card>
   );

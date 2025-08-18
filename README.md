@@ -1,4 +1,4 @@
-# 🎬 MovieRate: AI IMDb Platform
+# 🎬 CineTrack: AI IMDb Platform
 
 > An intelligent movie and TV show discovery platform powered by AI recommendations
 

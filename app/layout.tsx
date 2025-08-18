@@ -11,7 +11,7 @@ import { cookies } from "next/headers" // Import cookies
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "MovieRate",
+  title: "CineTrack",
   description: "Your personalized movie and TV show tracker.",
 }
 
